@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useRef, useEffect } from "react";
 import { UserPlus, Sparkles, Check } from "lucide-react";
 
 interface AddPlayerBarProps {
@@ -13,6 +13,11 @@ export default function AddPlayerBar({ onAddPlayer }: AddPlayerBarProps) {
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const nameInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    nameInputRef.current?.focus();
+  }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -31,6 +36,9 @@ export default function AddPlayerBar({ onAddPlayer }: AddPlayerBarProps) {
       setError(msg);
     } finally {
       setLoading(false);
+      setTimeout(() => {
+        nameInputRef.current?.focus();
+      }, 50);
     }
   };
 
@@ -67,6 +75,7 @@ export default function AddPlayerBar({ onAddPlayer }: AddPlayerBarProps) {
       <form onSubmit={handleSubmit} className="flex flex-col sm:flex-row gap-2.5">
         <div className="flex-1">
           <input
+            ref={nameInputRef}
             type="text"
             value={name}
             onChange={(e) => setName(e.target.value)}
@@ -74,6 +83,7 @@ export default function AddPlayerBar({ onAddPlayer }: AddPlayerBarProps) {
             className="w-full px-3.5 py-2.5 bg-slate-800 border border-slate-700 rounded-xl text-sm text-white placeholder-slate-500 focus:outline-hidden focus:border-emerald-500 transition"
             required
             disabled={loading}
+            autoFocus
           />
         </div>
 
