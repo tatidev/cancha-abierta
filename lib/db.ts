@@ -8,6 +8,12 @@ export function getDb(): Client {
     const url = process.env.TURSO_DATABASE_URL || "file:padel.db";
     const authToken = process.env.TURSO_AUTH_TOKEN || undefined;
 
+    if (url.startsWith("libsql://")) {
+      console.log("Connected to Turso Cloud:", url);
+    } else {
+      console.log("Using Local SQLite fallback: file:padel.db");
+    }
+
     client = createClient({
       url,
       authToken,
