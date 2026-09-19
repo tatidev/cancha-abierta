@@ -15,6 +15,15 @@ export async function PATCH(
     const { active, name, phone } = body;
     const db = await initDb();
 
+    // Look up player tournament_id
+    const playerRow = await db.execute({
+      sql: "SELECT tournament_id FROM players WHERE id = ?",
+      args: [playerId],
+    });
+    const tourneyId = playerRow.rows[0]?.tournament_id
+      ? Number(playerRow.rows[0].tournament_id)
+      : undefined;
+
     if (active !== undefined) {
       await db.execute({
         sql: "UPDATE players SET active = ? WHERE id = ?",
@@ -36,7 +45,7 @@ export async function PATCH(
       });
     }
 
-    const state = await getTournamentState();
+    const state = await getTournamentState(tourneyId);
     return NextResponse.json({ success: true, state });
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : "Error al actualizar jugador";
@@ -54,6 +63,14 @@ export async function DELETE(
     const playerId = parseInt(id, 10);
     const db = await initDb();
 
+    const playerRow = await db.execute({
+      sql: "SELECT tournament_id FROM players WHERE id = ?",
+      args: [playerId],
+    });
+    const tourneyId = playerRow.rows[0]?.tournament_id
+      ? Number(playerRow.rows[0].tournament_id)
+      : undefined;
+
     // Check if player has played any matches
     const matchesCount = await db.execute({
       sql: `SELECT COUNT(*) as count FROM matches 
@@ -65,13 +82,11 @@ export async function DELETE(
     const hasMatches = Number(matchesCount.rows[0]?.count || 0) > 0;
 
     if (hasMatches) {
-      // If player already played matches, instead of hard deleting which would break historical scores,
-      // we deactivate the player
       await db.execute({
         sql: "UPDATE players SET active = 0 WHERE id = ?",
         args: [playerId],
       });
-      const state = await getTournamentState();
+      const state = await getTournamentState(tourneyId);
       return NextResponse.json({
         success: true,
         message: "El jugador ya tiene partidos jugados, por lo que fue pausado/desactivado para conservar el historial.",
@@ -85,7 +100,7 @@ export async function DELETE(
       args: [playerId],
     });
 
-    const state = await getTournamentState();
+    const state = await getTournamentState(tourneyId);
     return NextResponse.json({ success: true, message: "Jugador eliminado con éxito.", state });
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : "Error al eliminar jugador";

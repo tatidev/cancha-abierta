@@ -15,6 +15,15 @@ export async function PATCH(
     const { action, t1_games, t2_games } = body;
     const db = await initDb();
 
+    // Look up match tournament_id
+    const matchRow = await db.execute({
+      sql: "SELECT tournament_id FROM matches WHERE id = ?",
+      args: [matchId],
+    });
+    const tourneyId = matchRow.rows[0]?.tournament_id
+      ? Number(matchRow.rows[0].tournament_id)
+      : undefined;
+
     if (action === "finish" || action === "edit_score") {
       const g1 = parseInt(t1_games, 10);
       const g2 = parseInt(t2_games, 10);
@@ -46,7 +55,7 @@ export async function PATCH(
       });
     }
 
-    const state = await getTournamentState();
+    const state = await getTournamentState(tourneyId);
     return NextResponse.json({ success: true, state });
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : "Error al actualizar partido";
@@ -64,12 +73,20 @@ export async function DELETE(
     const matchId = parseInt(id, 10);
     const db = await initDb();
 
+    const matchRow = await db.execute({
+      sql: "SELECT tournament_id FROM matches WHERE id = ?",
+      args: [matchId],
+    });
+    const tourneyId = matchRow.rows[0]?.tournament_id
+      ? Number(matchRow.rows[0].tournament_id)
+      : undefined;
+
     await db.execute({
       sql: "DELETE FROM matches WHERE id = ?",
       args: [matchId],
     });
 
-    const state = await getTournamentState();
+    const state = await getTournamentState(tourneyId);
     return NextResponse.json({ success: true, message: "Partido eliminado.", state });
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : "Error al eliminar partido";
