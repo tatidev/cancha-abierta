@@ -68,11 +68,21 @@ export default function AssignCourtModal({
       currentRound
     );
     if (result.proposedMatches.length > 0) {
-      setAutoMatch(result.proposedMatches[0]);
+      const pm = result.proposedMatches[0];
+      setAutoMatch(pm);
       setAutoWarning(undefined);
+      // Pre-fill manual dropdowns with the auto suggestion by default
+      setP1Id(pm.team1[0].id);
+      setP2Id(pm.team1[1].id);
+      setP3Id(pm.team2[0].id);
+      setP4Id(pm.team2[1].id);
     } else {
       setAutoMatch(null);
       setAutoWarning(result.warning || "No se encontró una combinación sin repetir parejas.");
+      setP1Id("");
+      setP2Id("");
+      setP3Id("");
+      setP4Id("");
     }
   };
 
@@ -80,10 +90,6 @@ export default function AssignCourtModal({
     if (isOpen) {
       setMode("auto");
       setError(null);
-      setP1Id("");
-      setP2Id("");
-      setP3Id("");
-      setP4Id("");
       runAutoGeneration();
     }
   }, [isOpen, courtNumber, currentRound]);
@@ -252,7 +258,15 @@ export default function AssignCourtModal({
 
           <button
             type="button"
-            onClick={() => setMode("manual")}
+            onClick={() => {
+              setMode("manual");
+              if (autoMatch && (!p1Id || !p2Id || !p3Id || !p4Id)) {
+                setP1Id(autoMatch.team1[0].id);
+                setP2Id(autoMatch.team1[1].id);
+                setP3Id(autoMatch.team2[0].id);
+                setP4Id(autoMatch.team2[1].id);
+              }
+            }}
             className={`flex-1 flex items-center justify-center gap-1.5 py-2 px-3 rounded-xl text-xs font-bold transition ${
               mode === "manual"
                 ? "bg-emerald-600 text-white shadow-md shadow-emerald-900/30"
@@ -344,9 +358,25 @@ export default function AssignCourtModal({
           {/* TAB 2: MANUAL */}
           {mode === "manual" && (
             <div className="space-y-4">
-              <p className="text-xs text-slate-400">
-                Elegí los 4 jugadores para la cancha. Si alguna pareja ya jugó junta antes, el sistema te avisará pero podrás confirmarlo de todos modos.
-              </p>
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 bg-slate-800/60 p-3 rounded-xl border border-slate-700/60 text-xs">
+                <span className="text-slate-300 text-[11px]">
+                  💡 <strong>Sugerencia cargada por defecto:</strong> Podés cambiar cualquiera de los 4 jugadores.
+                </span>
+                {autoMatch && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setP1Id(autoMatch.team1[0].id);
+                      setP2Id(autoMatch.team1[1].id);
+                      setP3Id(autoMatch.team2[0].id);
+                      setP4Id(autoMatch.team2[1].id);
+                    }}
+                    className="text-[11px] text-emerald-400 hover:text-emerald-300 font-semibold underline shrink-0 cursor-pointer text-left"
+                  >
+                    Restablecer sugerencia
+                  </button>
+                )}
+              </div>
 
               {/* Team 1 Selection */}
               <div className="bg-emerald-950/25 border border-emerald-500/30 rounded-xl p-3.5 space-y-3">
