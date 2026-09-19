@@ -62,93 +62,114 @@ export default function Navbar({
   return (
     <>
       <header className="sticky top-0 z-40 bg-slate-900/90 backdrop-blur-md border-b border-slate-800 text-white">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between gap-3">
+        <div className="max-w-7xl mx-auto px-3 sm:px-6 h-16 flex items-center justify-between gap-2 sm:gap-4">
           {/* Logo & Title */}
-          <div className="flex items-center gap-3 min-w-0">
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-emerald-500 to-teal-700 flex items-center justify-center text-white shadow-lg shadow-emerald-900/30 shrink-0">
-              <Trophy size={20} />
+          <div className="flex items-center gap-2.5 sm:gap-3 min-w-0 flex-1">
+            <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-gradient-to-br from-emerald-500 to-teal-700 flex items-center justify-center text-white shadow-lg shadow-emerald-900/30 shrink-0">
+              <Trophy size={18} className="sm:w-5 sm:h-5" />
             </div>
-            <div className="min-w-0">
+            <div className="min-w-0 flex-1">
               <div className="flex items-center gap-2">
-                <h1 className="font-extrabold text-base sm:text-lg tracking-tight text-white truncate">
+                <h1 className="font-extrabold text-sm sm:text-base tracking-tight text-white truncate">
                   {tournamentName || "Torneo de Pádel"}
                 </h1>
-                {isViewingArchived ? (
-                  <span className="flex items-center gap-1 px-2 py-0.5 bg-amber-500/20 text-amber-400 border border-amber-500/30 rounded-full text-[10px] font-bold tracking-wider shrink-0">
-                    HISTORIAL
-                  </span>
-                ) : (
-                  <span className="flex items-center gap-1.5 px-2 py-0.5 bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 rounded-full text-[10px] font-bold tracking-wider shrink-0">
-                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping" />
-                    EN VIVO
-                  </span>
-                )}
+                {/* Desktop Badge */}
+                <div className="hidden sm:inline-flex">
+                  {isViewingArchived ? (
+                    <span className="flex items-center gap-1 px-2 py-0.5 bg-amber-500/20 text-amber-400 border border-amber-500/30 rounded-full text-[10px] font-bold tracking-wider shrink-0">
+                      HISTORIAL
+                    </span>
+                  ) : (
+                    <span className="flex items-center gap-1.5 px-2 py-0.5 bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 rounded-full text-[10px] font-bold tracking-wider shrink-0">
+                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping" />
+                      EN VIVO
+                    </span>
+                  )}
+                </div>
               </div>
-              <p className="text-[11px] text-slate-400 hidden sm:flex items-center gap-2">
+
+              {/* Subtitle line (Badge on mobile, Date on both) */}
+              <div className="flex items-center gap-2 text-[11px] text-slate-400 mt-0.5">
+                {/* Mobile Badge */}
+                <div className="sm:hidden shrink-0">
+                  {isViewingArchived ? (
+                    <span className="flex items-center gap-1 px-1.5 py-0.2 bg-amber-500/20 text-amber-400 border border-amber-500/30 rounded-full text-[9px] font-bold tracking-wider">
+                      HISTORIAL
+                    </span>
+                  ) : (
+                    <span className="inline-flex items-center gap-1 px-1.5 py-0.5 bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 rounded-full text-[9px] font-bold tracking-wider">
+                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                      EN VIVO
+                    </span>
+                  )}
+                </div>
+
                 {tournamentDate && (
-                  <span className="flex items-center gap-1 text-slate-300">
-                    <Calendar size={12} /> {formatDate(tournamentDate)}
+                  <span className="flex items-center gap-1 text-slate-300 truncate text-[10px] sm:text-[11px]">
+                    <Calendar size={11} className="shrink-0" />
+                    <span>{formatDate(tournamentDate)}</span>
                   </span>
                 )}
-                <span>• Americano Individual</span>
-              </p>
+                <span className="hidden md:inline">• Americano Individual</span>
+              </div>
             </div>
           </div>
 
           {/* Actions */}
-          <div className="flex items-center gap-2 shrink-0">
+          <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
             {/* Tournaments History button */}
             <button
               type="button"
               onClick={onOpenTournaments}
-              className="flex items-center gap-1.5 px-3 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-xl text-xs font-semibold border border-slate-700 transition"
+              className="p-2 sm:px-3 sm:py-2 bg-slate-800/90 hover:bg-slate-700 text-slate-200 rounded-xl text-xs font-semibold border border-slate-700 transition flex items-center gap-1.5"
               title="Historial de torneos"
             >
-              <History size={15} />
-              <span className="hidden sm:inline">Torneos</span>
+              <History size={16} />
+              <span className="hidden md:inline">Torneos</span>
             </button>
 
             {/* Share QR */}
             <button
               type="button"
               onClick={onOpenQr}
-              className="flex items-center gap-1.5 px-3 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-xl text-xs font-semibold border border-slate-700 transition"
+              className="p-2 sm:px-3 sm:py-2 bg-slate-800/90 hover:bg-slate-700 text-slate-200 rounded-xl text-xs font-semibold border border-slate-700 transition flex items-center gap-1.5"
               title="Compartir QR para jugadores"
             >
-              <Share2 size={15} />
-              <span className="hidden sm:inline">QR</span>
+              <Share2 size={16} />
+              <span className="hidden md:inline">QR</span>
             </button>
 
             {/* Admin Controls */}
             {isAdmin ? (
-              <div className="flex items-center gap-1.5">
+              <div className="flex items-center gap-1 sm:gap-1.5">
                 <button
                   type="button"
                   onClick={onOpenSettings}
-                  className="flex items-center gap-1.5 px-3 py-2 bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-300 border border-emerald-500/40 rounded-xl text-xs font-semibold transition"
+                  className="p-2 sm:px-3 sm:py-2 bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-300 border border-emerald-500/40 rounded-xl text-xs font-semibold transition flex items-center gap-1.5"
                   title="Ajustes del torneo"
                 >
-                  <Settings size={15} />
+                  <Settings size={16} />
                   <span className="hidden md:inline">Ajustes</span>
                 </button>
                 <button
                   type="button"
                   onClick={onLogoutAdmin}
-                  className="flex items-center gap-1.5 px-3 py-2 bg-slate-800 hover:bg-rose-950/40 hover:text-rose-300 text-slate-300 border border-slate-700 rounded-xl text-xs font-semibold transition"
+                  className="p-2 sm:px-2.5 sm:py-2 bg-slate-800 hover:bg-rose-950/40 hover:text-rose-300 text-slate-300 border border-slate-700 rounded-xl text-xs font-semibold transition flex items-center gap-1.5"
                   title="Salir de modo administración"
                 >
-                  <LogOut size={15} />
-                  <span className="hidden sm:inline">Salir</span>
+                  <LogOut size={16} />
+                  <span className="hidden md:inline">Salir</span>
                 </button>
               </div>
             ) : (
               <button
                 type="button"
                 onClick={() => setShowPinModal(true)}
-                className="flex items-center gap-1.5 px-3.5 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-bold transition shadow-md shadow-emerald-900/30"
+                className="flex items-center gap-1.5 px-2.5 sm:px-3.5 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-bold transition shadow-md shadow-emerald-900/30"
               >
                 <Shield size={15} />
-                <span>Mesa de Control</span>
+                <span className="hidden sm:inline">Mesa de Control</span>
+                <span className="sm:hidden">Mesa</span>
               </button>
             )}
           </div>
