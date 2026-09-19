@@ -31,7 +31,7 @@ export const metadata: Metadata = {
     siteName: "Cancha Abierta",
     images: [
       {
-        url: "/og-image.jpg",
+        url: "/og-image.jpg?v=2",
         width: 1200,
         height: 675,
         alt: "Cancha Abierta - Torneo de Pádel en Vivo",
@@ -45,7 +45,7 @@ export const metadata: Metadata = {
     title: "Cancha Abierta • Torneo de Pádel en Vivo",
     description:
       "Sigue en vivo los partidos, resultados y la tabla de posiciones del torneo americano.",
-    images: ["/og-image.jpg"],
+    images: ["/og-image.jpg?v=2"],
   },
 };
 
