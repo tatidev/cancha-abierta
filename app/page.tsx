@@ -101,6 +101,23 @@ export default function PadelApp() {
       if (savedAdmin === "true") {
         setIsAdmin(true);
       }
+
+      // Track page view once per browser session
+      const alreadyTracked = sessionStorage.getItem("padel_pv_tracked");
+      if (!alreadyTracked) {
+        sessionStorage.setItem("padel_pv_tracked", "true");
+        fetch("/api/analytics/track", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            event_type: "page_view",
+            metadata: {
+              screen_width: window.innerWidth,
+              is_mobile: window.innerWidth < 768,
+            },
+          }),
+        }).catch(() => {});
+      }
     }
 
     // Auto-refresh every 5 seconds for live real-time sync across all devices
@@ -117,6 +134,11 @@ export default function PadelApp() {
     if (typeof window !== "undefined") {
       localStorage.setItem("padel_admin_authenticated", "true");
     }
+    fetch("/api/analytics/track", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ event_type: "admin_login" }),
+    }).catch(() => {});
   };
 
   const handleLogoutAdmin = () => {
@@ -388,7 +410,14 @@ export default function PadelApp() {
         adminPin={settings.admin_pin}
         onLoginAdmin={handleLoginAdmin}
         onLogoutAdmin={handleLogoutAdmin}
-        onOpenQr={() => setIsQrOpen(true)}
+        onOpenQr={() => {
+          setIsQrOpen(true);
+          fetch("/api/analytics/track", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ event_type: "qr_opened" }),
+          }).catch(() => {});
+        }}
         onOpenTournaments={() => setIsTournamentsOpen(true)}
         onOpenSettings={() => setIsSettingsOpen(true)}
         lastUpdated={lastUpdated}
@@ -473,7 +502,7 @@ export default function PadelApp() {
             <div>
               <span className="text-[11px] text-slate-400 block font-medium">Regla Formato</span>
               <span className="text-lg font-bold text-emerald-400 truncate">
-                A {settings.target_games} games (Dif)
+                A {settings.target_games} games
               </span>
             </div>
           </div>
@@ -489,11 +518,10 @@ export default function PadelApp() {
           <button
             type="button"
             onClick={() => setActiveTab("courts")}
-            className={`flex-1 flex items-center justify-center gap-2 py-2.5 px-3 rounded-xl text-xs sm:text-sm font-bold transition ${
-              activeTab === "courts"
-                ? "bg-emerald-600 text-white shadow-md shadow-emerald-900/30"
-                : "text-slate-400 hover:text-slate-200 hover:bg-slate-800/60"
-            }`}
+            className={`flex-1 flex items-center justify-center gap-2 py-2.5 px-3 rounded-xl text-xs sm:text-sm font-bold transition ${activeTab === "courts"
+              ? "bg-emerald-600 text-white shadow-md shadow-emerald-900/30"
+              : "text-slate-400 hover:text-slate-200 hover:bg-slate-800/60"
+              }`}
           >
             <PlayCircle size={18} />
             <span>Canchas en Juego</span>
@@ -507,11 +535,10 @@ export default function PadelApp() {
           <button
             type="button"
             onClick={() => setActiveTab("standings")}
-            className={`flex-1 flex items-center justify-center gap-2 py-2.5 px-3 rounded-xl text-xs sm:text-sm font-bold transition ${
-              activeTab === "standings"
-                ? "bg-emerald-600 text-white shadow-md shadow-emerald-900/30"
-                : "text-slate-400 hover:text-slate-200 hover:bg-slate-800/60"
-            }`}
+            className={`flex-1 flex items-center justify-center gap-2 py-2.5 px-3 rounded-xl text-xs sm:text-sm font-bold transition ${activeTab === "standings"
+              ? "bg-emerald-600 text-white shadow-md shadow-emerald-900/30"
+              : "text-slate-400 hover:text-slate-200 hover:bg-slate-800/60"
+              }`}
           >
             <Trophy size={18} />
             <span>Posiciones</span>
@@ -520,11 +547,10 @@ export default function PadelApp() {
           <button
             type="button"
             onClick={() => setActiveTab("history")}
-            className={`flex-1 flex items-center justify-center gap-2 py-2.5 px-3 rounded-xl text-xs sm:text-sm font-bold transition ${
-              activeTab === "history"
-                ? "bg-emerald-600 text-white shadow-md shadow-emerald-900/30"
-                : "text-slate-400 hover:text-slate-200 hover:bg-slate-800/60"
-            }`}
+            className={`flex-1 flex items-center justify-center gap-2 py-2.5 px-3 rounded-xl text-xs sm:text-sm font-bold transition ${activeTab === "history"
+              ? "bg-emerald-600 text-white shadow-md shadow-emerald-900/30"
+              : "text-slate-400 hover:text-slate-200 hover:bg-slate-800/60"
+              }`}
           >
             <History size={18} />
             <span>Historial ({finishedMatchesCount})</span>
@@ -563,8 +589,17 @@ export default function PadelApp() {
       </main>
 
       {/* Footer */}
-      <footer className="border-t border-slate-800/80 bg-slate-900/40 py-4 text-center text-xs text-slate-500">
-        <p>Sistema de Gestión de Torneos de Pádel • Americano Individual con Rotación de Parejas</p>
+      <footer className="border-t border-slate-800/80 bg-slate-900/40 py-4 px-6 text-center text-xs text-slate-500">
+        <div className="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-2">
+          <p>Sistema de Gestión de Torneos de Pádel • Americano Individual con Rotación de Parejas</p>
+          <a
+            href="/metricas"
+            className="text-[11px] text-slate-600 hover:text-slate-400 transition inline-flex items-center gap-1"
+            title="Panel de Telemetría Privado"
+          >
+            <span>🔒</span> Métricas
+          </a>
+        </div>
       </footer>
 
       {/* Modals */}

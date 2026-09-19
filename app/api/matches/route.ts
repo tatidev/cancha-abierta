@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { initDb } from "@/lib/db";
 import { getTournamentState } from "@/lib/stats";
 import { validateManualMatch } from "@/lib/matchmaker";
+import { logAnalyticsEvent } from "@/lib/analytics";
 
 export const dynamic = "force-dynamic";
 
@@ -84,6 +85,11 @@ export async function POST(req: Request) {
         args: [tourneyId, round, court, t1_p1_id, t1_p2_id, t2_p1_id, t2_p2_id],
       });
     }
+
+    logAnalyticsEvent("match_assigned", {
+      tournament_id: tourneyId,
+      metadata: { count: matchesToCreate.length },
+    });
 
     const updatedState = await getTournamentState(tourneyId);
     return NextResponse.json({

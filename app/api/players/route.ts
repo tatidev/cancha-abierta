@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { initDb } from "@/lib/db";
 import { getTournamentState } from "@/lib/stats";
+import { logAnalyticsEvent } from "@/lib/analytics";
 
 export const dynamic = "force-dynamic";
 
@@ -42,6 +43,11 @@ export async function POST(req: Request) {
     await db.execute({
       sql: "INSERT INTO players (tournament_id, name, phone, active) VALUES (?, ?, ?, 1)",
       args: [tourneyId, trimmedName, phone ? phone.trim() : null],
+    });
+
+    logAnalyticsEvent("player_added", {
+      tournament_id: tourneyId,
+      metadata: { name: trimmedName },
     });
 
     const state = await getTournamentState(tourneyId);

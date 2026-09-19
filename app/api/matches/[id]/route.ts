@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { initDb } from "@/lib/db";
 import { getTournamentState } from "@/lib/stats";
+import { logAnalyticsEvent } from "@/lib/analytics";
 
 export const dynamic = "force-dynamic";
 
@@ -47,6 +48,11 @@ export async function PATCH(
               SET t1_games = ?, t2_games = ?, status = 'finished', finished_at = CURRENT_TIMESTAMP
               WHERE id = ?`,
         args: [g1, g2, matchId],
+      });
+
+      logAnalyticsEvent("score_recorded", {
+        tournament_id: tourneyId,
+        metadata: { match_id: matchId, score: `${g1}-${g2}` },
       });
     } else if (action === "cancel") {
       await db.execute({
