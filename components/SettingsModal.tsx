@@ -22,6 +22,7 @@ export default function SettingsModal({
   const [courtsCount, setCourtsCount] = useState<number>(settings.courts_count || 5);
   const [targetGames, setTargetGames] = useState<number>(settings.target_games || 4);
   const [tournamentName, setTournamentName] = useState<string>(settings.tournament_name || "");
+  const [tournamentDate, setTournamentDate] = useState<string>(settings.tournament_date || "");
   const [adminPin, setAdminPin] = useState<string>(settings.admin_pin || "1234");
   const [saving, setSaving] = useState(false);
   const [resetting, setResetting] = useState(false);
@@ -40,6 +41,7 @@ export default function SettingsModal({
         courts_count: courtsCount,
         target_games: targetGames,
         tournament_name: tournamentName,
+        tournament_date: tournamentDate,
         admin_pin: adminPin,
       });
       setMessage("Configuración guardada con éxito.");
@@ -110,6 +112,20 @@ export default function SettingsModal({
               onChange={(e) => setTournamentName(e.target.value)}
               className="w-full px-3.5 py-2.5 bg-slate-800 border border-slate-700 rounded-xl text-sm text-white focus:outline-hidden focus:border-emerald-500"
               placeholder="Ej: Torneo Americano Nocturno"
+              required
+            />
+          </div>
+
+          {/* Tournament Date */}
+          <div>
+            <label className="text-xs font-semibold text-slate-300 block mb-1.5">
+              Fecha del Torneo
+            </label>
+            <input
+              type="date"
+              value={tournamentDate}
+              onChange={(e) => setTournamentDate(e.target.value)}
+              className="w-full px-3.5 py-2.5 bg-slate-800 border border-slate-700 rounded-xl text-sm text-white focus:outline-hidden focus:border-emerald-500"
               required
             />
           </div>

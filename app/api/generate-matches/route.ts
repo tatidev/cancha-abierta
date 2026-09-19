@@ -7,7 +7,8 @@ export const dynamic = "force-dynamic";
 export async function POST(req: Request) {
   try {
     const body = await req.json().catch(() => ({}));
-    const state = await getTournamentState();
+    const tourneyId = body.tournament_id ? parseInt(body.tournament_id, 10) : undefined;
+    const state = await getTournamentState(tourneyId);
 
     // Determine target courts
     let targetCourts: number[] = [];

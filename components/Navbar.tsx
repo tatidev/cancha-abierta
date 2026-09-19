@@ -1,26 +1,34 @@
 "use client";
 
 import React, { useState } from "react";
-import { Trophy, Share2, Shield, Settings, LogOut, Key, Check } from "lucide-react";
+import { Trophy, Share2, Shield, Settings, LogOut, Key, Calendar, History, ArrowLeft } from "lucide-react";
 
 interface NavbarProps {
   tournamentName: string;
+  tournamentDate?: string;
+  isViewingArchived?: boolean;
+  onBackToActive?: () => void;
   isAdmin: boolean;
   adminPin: string;
   onLoginAdmin: () => void;
   onLogoutAdmin: () => void;
   onOpenQr: () => void;
+  onOpenTournaments: () => void;
   onOpenSettings: () => void;
   lastUpdated: Date | null;
 }
 
 export default function Navbar({
   tournamentName,
+  tournamentDate,
+  isViewingArchived,
+  onBackToActive,
   isAdmin,
   adminPin,
   onLoginAdmin,
   onLogoutAdmin,
   onOpenQr,
+  onOpenTournaments,
   onOpenSettings,
   lastUpdated,
 }: NavbarProps) {
@@ -40,6 +48,17 @@ export default function Navbar({
     }
   };
 
+  const formatDate = (dateStr?: string) => {
+    if (!dateStr) return "";
+    try {
+      const [year, month, day] = dateStr.split("-");
+      if (year && month && day) return `${day}/${month}/${year}`;
+      return dateStr;
+    } catch {
+      return dateStr;
+    }
+  };
+
   return (
     <>
       <header className="sticky top-0 z-40 bg-slate-900/90 backdrop-blur-md border-b border-slate-800 text-white">
@@ -54,19 +73,41 @@ export default function Navbar({
                 <h1 className="font-extrabold text-base sm:text-lg tracking-tight text-white truncate">
                   {tournamentName || "Torneo de Pádel"}
                 </h1>
-                <span className="flex items-center gap-1.5 px-2 py-0.5 bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 rounded-full text-[10px] font-bold tracking-wider shrink-0">
-                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping" />
-                  EN VIVO
-                </span>
+                {isViewingArchived ? (
+                  <span className="flex items-center gap-1 px-2 py-0.5 bg-amber-500/20 text-amber-400 border border-amber-500/30 rounded-full text-[10px] font-bold tracking-wider shrink-0">
+                    HISTORIAL
+                  </span>
+                ) : (
+                  <span className="flex items-center gap-1.5 px-2 py-0.5 bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 rounded-full text-[10px] font-bold tracking-wider shrink-0">
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping" />
+                    EN VIVO
+                  </span>
+                )}
               </div>
-              <p className="text-[11px] text-slate-400 hidden sm:block">
-                Americano Individual • Sin repetición de parejas
+              <p className="text-[11px] text-slate-400 hidden sm:flex items-center gap-2">
+                {tournamentDate && (
+                  <span className="flex items-center gap-1 text-slate-300">
+                    <Calendar size={12} /> {formatDate(tournamentDate)}
+                  </span>
+                )}
+                <span>• Americano Individual</span>
               </p>
             </div>
           </div>
 
           {/* Actions */}
           <div className="flex items-center gap-2 shrink-0">
+            {/* Tournaments History button */}
+            <button
+              type="button"
+              onClick={onOpenTournaments}
+              className="flex items-center gap-1.5 px-3 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-xl text-xs font-semibold border border-slate-700 transition"
+              title="Historial de torneos"
+            >
+              <History size={15} />
+              <span className="hidden sm:inline">Torneos</span>
+            </button>
+
             {/* Share QR */}
             <button
               type="button"
@@ -75,7 +116,7 @@ export default function Navbar({
               title="Compartir QR para jugadores"
             >
               <Share2 size={15} />
-              <span className="hidden sm:inline">Compartir QR</span>
+              <span className="hidden sm:inline">QR</span>
             </button>
 
             {/* Admin Controls */}
@@ -113,8 +154,26 @@ export default function Navbar({
           </div>
         </div>
 
+        {/* Viewing Archived Tournament Banner */}
+        {isViewingArchived && (
+          <div className="bg-amber-950/70 border-t border-b border-amber-500/30 px-4 py-1.5 flex items-center justify-between text-xs text-amber-300">
+            <span>
+              📜 <strong>Modo Historial:</strong> Estás viendo los resultados archivados de este torneo (solo lectura).
+            </span>
+            {onBackToActive && (
+              <button
+                type="button"
+                onClick={onBackToActive}
+                className="flex items-center gap-1 px-2.5 py-1 bg-amber-500/20 hover:bg-amber-500/30 text-amber-200 rounded-md font-bold transition"
+              >
+                <ArrowLeft size={13} /> Volver al Torneo Actual
+              </button>
+            )}
+          </div>
+        )}
+
         {/* Admin Bar Notification */}
-        {isAdmin && (
+        {isAdmin && !isViewingArchived && (
           <div className="bg-emerald-950/60 border-t border-b border-emerald-500/30 px-4 py-1 text-center text-xs text-emerald-300 font-medium">
             🛡️ <span className="font-bold">Modo Mesa de Control Activo:</span> Podés cargar resultados, generar partidos y gestionar canchas.
           </div>

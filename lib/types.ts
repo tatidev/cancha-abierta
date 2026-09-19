@@ -1,5 +1,20 @@
+export interface Tournament {
+  id: number;
+  name: string;
+  date: string; // YYYY-MM-DD
+  courts_count: number;
+  target_games: number;
+  status: 'active' | 'finished';
+  created_at: string;
+  players_count?: number;
+  matches_count?: number;
+  leader_name?: string;
+  leader_points?: number;
+}
+
 export interface Player {
   id: number;
+  tournament_id?: number;
   name: string;
   phone?: string;
   active: number; // 1 = active, 0 = paused/inactive
@@ -21,6 +36,7 @@ export interface PlayerStats extends Player {
 
 export interface Match {
   id: number;
+  tournament_id?: number;
   round: number;
   court: number;
   t1_p1_id: number;
@@ -41,11 +57,13 @@ export interface Match {
 }
 
 export interface TournamentSettings {
+  active_tournament_id: number;
   tournament_name: string;
+  tournament_date: string;
   courts_count: number;
   target_games: number;
   admin_pin: string;
-  status: 'in_progress' | 'finished';
+  status: 'active' | 'finished';
 }
 
 export interface ProposedMatch {

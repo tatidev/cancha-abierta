@@ -17,17 +17,20 @@ import ScoreModal from "@/components/ScoreModal";
 import MatchmakerModal from "@/components/MatchmakerModal";
 import PlayerModal from "@/components/PlayerModal";
 import SettingsModal from "@/components/SettingsModal";
+import TournamentsModal from "@/components/TournamentsModal";
 import QrModal from "@/components/QrModal";
 import { Trophy, PlayCircle, History, Sparkles, Users, RefreshCw } from "lucide-react";
 
 export default function PadelApp() {
   // Main tournament state
   const [settings, setSettings] = useState<TournamentSettings>({
-    tournament_name: "Torneo Americano de Pádel",
+    active_tournament_id: 1,
+    tournament_name: "Torneo Cancha Libre",
+    tournament_date: new Date().toISOString().split("T")[0],
     courts_count: 5,
     target_games: 4,
     admin_pin: "1234",
-    status: "in_progress",
+    status: "active",
   });
   const [players, setPlayers] = useState<PlayerStats[]>([]);
   const [matches, setMatches] = useState<Match[]>([]);
@@ -35,6 +38,9 @@ export default function PadelApp() {
     { courtNumber: number; activeMatch: Match | null }[]
   >([]);
   const [currentlyPlayingIds, setCurrentlyPlayingIds] = useState<number[]>([]);
+
+  // Multi-tournament viewing state
+  const [viewingTournamentId, setViewingTournamentId] = useState<number | undefined>(undefined);
 
   // Organization & Session
   const [isAdmin, setIsAdmin] = useState(false);
@@ -44,6 +50,7 @@ export default function PadelApp() {
   // Modals state
   const [isQrOpen, setIsQrOpen] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [isTournamentsOpen, setIsTournamentsOpen] = useState(false);
   const [selectedPlayer, setSelectedPlayer] = useState<PlayerStats | null>(null);
   const [scoringMatch, setScoringMatch] = useState<Match | null>(null);
 
@@ -55,9 +62,11 @@ export default function PadelApp() {
   const [targetCourtForGen, setTargetCourtForGen] = useState<number | undefined>();
 
   // Fetch tournament state
-  const fetchState = useCallback(async () => {
+  const fetchState = useCallback(async (customTournamentId?: number) => {
     try {
-      const res = await fetch("/api/tournament", { cache: "no-store" });
+      const tId = customTournamentId !== undefined ? customTournamentId : viewingTournamentId;
+      const url = tId ? `/api/tournament?tournament_id=${tId}` : "/api/tournament";
+      const res = await fetch(url, { cache: "no-store" });
       if (!res.ok) throw new Error("Error al consultar el servidor");
       const data = await res.json();
 
@@ -70,7 +79,7 @@ export default function PadelApp() {
     } catch (err) {
       console.error("Error fetching tournament state:", err);
     }
-  }, []);
+  }, [viewingTournamentId]);
 
   // Initialize and check admin session
   useEffect(() => {
@@ -106,12 +115,64 @@ export default function PadelApp() {
     }
   };
 
+  // Tournament switching & management
+  const handleSelectTournament = (tId: number) => {
+    setViewingTournamentId(tId);
+    fetchState(tId);
+  };
+
+  const handleBackToActive = () => {
+    setViewingTournamentId(undefined);
+    fetchState(undefined);
+  };
+
+  const handleCreateTournament = async (data: {
+    name: string;
+    date: string;
+    courts_count: number;
+    target_games: number;
+    copy_players_from_id?: number;
+  }) => {
+    const res = await fetch("/api/tournaments", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(data),
+    });
+    const json = await res.json();
+    if (!res.ok) throw new Error(json.error || "Error al crear nuevo torneo");
+    setViewingTournamentId(undefined);
+    await fetchState(undefined);
+  };
+
+  const handleDeleteTournament = async (tId: number) => {
+    const res = await fetch(`/api/tournaments/${tId}`, { method: "DELETE" });
+    const json = await res.json();
+    if (!res.ok) throw new Error(json.error || "Error al eliminar torneo");
+    if (viewingTournamentId === tId) {
+      setViewingTournamentId(undefined);
+    }
+    await fetchState(undefined);
+  };
+
+  const handleSetActiveTournament = async (tId: number) => {
+    const res = await fetch(`/api/tournaments/${tId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "set_active" }),
+    });
+    const json = await res.json();
+    if (!res.ok) throw new Error(json.error || "Error al activar torneo");
+    setViewingTournamentId(tId);
+    await fetchState(tId);
+  };
+
   // Add player
   const handleAddPlayer = async (name: string, phone?: string) => {
+    const currentTourneyId = viewingTournamentId || settings.active_tournament_id;
     const res = await fetch("/api/players", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name, phone }),
+      body: JSON.stringify({ name, phone, tournament_id: currentTourneyId }),
     });
     const data = await res.json();
     if (!res.ok) throw new Error(data.error || "No se pudo agregar al jugador");
@@ -141,11 +202,12 @@ export default function PadelApp() {
   // Matchmaking: Generate matches
   const handleGenerateMatches = async (courtNumber?: number) => {
     setTargetCourtForGen(courtNumber);
+    const currentTourneyId = viewingTournamentId || settings.active_tournament_id;
     try {
       const res = await fetch("/api/generate-matches", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ courtNumber }),
+        body: JSON.stringify({ courtNumber, tournament_id: currentTourneyId }),
       });
       const data = await res.json();
       if (!res.ok) {
@@ -165,7 +227,9 @@ export default function PadelApp() {
 
   // Confirm proposed matches
   const handleConfirmProposedMatches = async (matchesToConfirm: ProposedMatch[]) => {
+    const currentTourneyId = viewingTournamentId || settings.active_tournament_id;
     const payload = matchesToConfirm.map((m) => ({
+      tournament_id: currentTourneyId,
       court: m.court,
       round: m.round,
       t1_p1_id: m.team1[0].id,
@@ -177,7 +241,7 @@ export default function PadelApp() {
     const res = await fetch("/api/matches", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ matches: payload }),
+      body: JSON.stringify({ matches: payload, tournament_id: currentTourneyId }),
     });
 
     const data = await res.json();
@@ -200,7 +264,6 @@ export default function PadelApp() {
     const data = await res.json();
     if (!res.ok) throw new Error(data.error || "Error al registrar resultado");
 
-    // Nice visual celebration
     try {
       confetti({
         particleCount: 60,
@@ -265,6 +328,10 @@ export default function PadelApp() {
     await handleUpdateSettings({ courts_count: count });
   };
 
+  const isViewingArchived =
+    viewingTournamentId !== undefined &&
+    viewingTournamentId !== settings.active_tournament_id;
+
   const activeMatchesCount = courts.filter((c) => c.activeMatch !== null).length;
   const finishedMatchesCount = matches.filter((m) => m.status === "finished").length;
   const activePlayersCount = players.filter((p) => p.active === 1).length;
@@ -274,11 +341,15 @@ export default function PadelApp() {
       {/* Navbar */}
       <Navbar
         tournamentName={settings.tournament_name}
+        tournamentDate={settings.tournament_date}
+        isViewingArchived={isViewingArchived}
+        onBackToActive={handleBackToActive}
         isAdmin={isAdmin}
         adminPin={settings.admin_pin}
         onLoginAdmin={handleLoginAdmin}
         onLogoutAdmin={handleLogoutAdmin}
         onOpenQr={() => setIsQrOpen(true)}
+        onOpenTournaments={() => setIsTournamentsOpen(true)}
         onOpenSettings={() => setIsSettingsOpen(true)}
         lastUpdated={lastUpdated}
       />
@@ -336,8 +407,8 @@ export default function PadelApp() {
           </div>
         </div>
 
-        {/* Add Player Bar for Organizers */}
-        {isAdmin && (
+        {/* Add Player Bar for Organizers (only if active tournament) */}
+        {isAdmin && !isViewingArchived && (
           <AddPlayerBar onAddPlayer={handleAddPlayer} />
         )}
 
@@ -371,7 +442,7 @@ export default function PadelApp() {
             }`}
           >
             <Trophy size={18} />
-            <span>Posiciones en Vivo</span>
+            <span>Posiciones</span>
           </button>
 
           <button
@@ -392,7 +463,7 @@ export default function PadelApp() {
         {activeTab === "courts" && (
           <CourtsSection
             courts={courts}
-            isAdmin={isAdmin}
+            isAdmin={isAdmin && !isViewingArchived}
             onOpenScoreModal={(m) => setScoringMatch(m)}
             onGenerateMatches={handleGenerateMatches}
             onUpdateCourtsCount={handleQuickCourtsChange}
@@ -402,7 +473,7 @@ export default function PadelApp() {
         {activeTab === "standings" && (
           <LeaderboardTable
             players={players}
-            isAdmin={isAdmin}
+            isAdmin={isAdmin && !isViewingArchived}
             onSelectPlayer={(p) => setSelectedPlayer(p)}
             onTogglePlayerActive={handleTogglePlayerActive}
             onDeletePlayer={handleDeletePlayer}
@@ -412,7 +483,7 @@ export default function PadelApp() {
         {activeTab === "history" && (
           <MatchHistorySection
             matches={matches}
-            isAdmin={isAdmin}
+            isAdmin={isAdmin && !isViewingArchived}
             onEditMatch={(m) => setScoringMatch(m)}
             onDeleteMatch={handleDeleteMatch}
           />
@@ -429,6 +500,18 @@ export default function PadelApp() {
         isOpen={isQrOpen}
         onClose={() => setIsQrOpen(false)}
         tournamentName={settings.tournament_name}
+      />
+
+      <TournamentsModal
+        isOpen={isTournamentsOpen}
+        onClose={() => setIsTournamentsOpen(false)}
+        activeTournamentId={settings.active_tournament_id}
+        currentViewingTournamentId={viewingTournamentId || settings.active_tournament_id}
+        isAdmin={isAdmin}
+        onSelectTournament={handleSelectTournament}
+        onCreateTournament={handleCreateTournament}
+        onDeleteTournament={handleDeleteTournament}
+        onSetActiveTournament={handleSetActiveTournament}
       />
 
       <PlayerModal

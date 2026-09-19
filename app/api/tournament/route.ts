@@ -4,9 +4,13 @@ import { initDb } from "@/lib/db";
 
 export const dynamic = "force-dynamic";
 
-export async function GET() {
+export async function GET(req: Request) {
   try {
-    const state = await getTournamentState();
+    const url = new URL(req.url);
+    const tournamentIdParam = url.searchParams.get("tournament_id");
+    const targetId = tournamentIdParam ? parseInt(tournamentIdParam, 10) : undefined;
+
+    const state = await getTournamentState(targetId);
     return NextResponse.json(state);
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : "Error al obtener estado del torneo";
@@ -18,17 +22,27 @@ export async function GET() {
 export async function POST(req: Request) {
   try {
     const body = await req.json();
-    const { action, courts_count, target_games, tournament_name, admin_pin } = body;
+    const { action, courts_count, target_games, tournament_name, tournament_date, admin_pin } = body;
     const db = await initDb();
 
+    // Get active tournament id
+    const activeSetting = await db.execute("SELECT value FROM settings WHERE key = 'active_tournament_id'");
+    const activeTournamentId = activeSetting.rows[0]?.value ? parseInt(String(activeSetting.rows[0].value), 10) : 1;
+
     if (action === "reset_tournament") {
-      // Clear matches and optionally keep or clear players
       const keepPlayers = Boolean(body.keepPlayers);
-      await db.execute("DELETE FROM matches");
+      await db.execute({
+        sql: "DELETE FROM matches WHERE tournament_id = ?",
+        args: [activeTournamentId],
+      });
       if (!keepPlayers) {
-        await db.execute("DELETE FROM players");
+        await db.execute({
+          sql: "DELETE FROM players WHERE tournament_id = ?",
+          args: [activeTournamentId],
+        });
       }
-      return NextResponse.json({ success: true, message: "Torneo reiniciado con éxito" });
+      const state = await getTournamentState(activeTournamentId);
+      return NextResponse.json({ success: true, message: "Torneo reiniciado con éxito", state });
     }
 
     if (courts_count !== undefined) {
@@ -36,6 +50,10 @@ export async function POST(req: Request) {
       await db.execute({
         sql: "INSERT OR REPLACE INTO settings (key, value) VALUES ('courts_count', ?)",
         args: [count.toString()],
+      });
+      await db.execute({
+        sql: "UPDATE tournaments SET courts_count = ? WHERE id = ?",
+        args: [count, activeTournamentId],
       });
     }
 
@@ -45,12 +63,29 @@ export async function POST(req: Request) {
         sql: "INSERT OR REPLACE INTO settings (key, value) VALUES ('target_games', ?)",
         args: [tg.toString()],
       });
+      await db.execute({
+        sql: "UPDATE tournaments SET target_games = ? WHERE id = ?",
+        args: [tg, activeTournamentId],
+      });
     }
 
     if (tournament_name !== undefined && tournament_name.trim()) {
+      const trimmed = tournament_name.trim();
       await db.execute({
         sql: "INSERT OR REPLACE INTO settings (key, value) VALUES ('tournament_name', ?)",
-        args: [tournament_name.trim()],
+        args: [trimmed],
+      });
+      await db.execute({
+        sql: "UPDATE tournaments SET name = ? WHERE id = ?",
+        args: [trimmed, activeTournamentId],
+      });
+    }
+
+    if (tournament_date !== undefined && tournament_date.trim()) {
+      const trimmedDate = tournament_date.trim();
+      await db.execute({
+        sql: "UPDATE tournaments SET date = ? WHERE id = ?",
+        args: [trimmedDate, activeTournamentId],
       });
     }
 
@@ -61,7 +96,7 @@ export async function POST(req: Request) {
       });
     }
 
-    const state = await getTournamentState();
+    const state = await getTournamentState(activeTournamentId);
     return NextResponse.json(state);
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : "Error al actualizar configuración";

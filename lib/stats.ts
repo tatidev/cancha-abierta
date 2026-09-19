@@ -1,7 +1,8 @@
 import { initDb } from "./db";
-import { Match, Player, PlayerStats, TournamentSettings } from "./types";
+import { Match, Player, PlayerStats, Tournament, TournamentSettings } from "./types";
 
 export interface TournamentState {
+  tournament: Tournament;
   settings: TournamentSettings;
   players: PlayerStats[];
   matches: Match[];
@@ -12,7 +13,7 @@ export interface TournamentState {
   currentlyPlayingPlayerIds: number[];
 }
 
-export async function getTournamentState(): Promise<TournamentState> {
+export async function getTournamentState(targetTournamentId?: number): Promise<TournamentState> {
   const db = await initDb();
 
   // 1. Fetch settings
@@ -22,20 +23,65 @@ export async function getTournamentState(): Promise<TournamentState> {
     settingsMap[row.key as string] = row.value as string;
   }
 
-  const settings: TournamentSettings = {
-    tournament_name: settingsMap.tournament_name || "Torneo Americano de Pádel",
-    courts_count: parseInt(settingsMap.courts_count || "5", 10),
-    target_games: parseInt(settingsMap.target_games || "4", 10),
-    admin_pin: settingsMap.admin_pin || "1234",
-    status: (settingsMap.status as 'in_progress' | 'finished') || "in_progress",
+  const activeTournamentId = parseInt(
+    settingsMap.active_tournament_id || "1",
+    10
+  );
+
+  const tournamentId = targetTournamentId || activeTournamentId;
+
+  // 2. Fetch tournament details
+  let tournamentRow = await db.execute({
+    sql: "SELECT id, name, date, courts_count, target_games, status, created_at FROM tournaments WHERE id = ?",
+    args: [tournamentId],
+  });
+
+  if (tournamentRow.rows.length === 0) {
+    // Fallback: pick the latest or first tournament
+    const fallback = await db.execute("SELECT id, name, date, courts_count, target_games, status, created_at FROM tournaments ORDER BY id DESC LIMIT 1");
+    if (fallback.rows.length > 0) {
+      tournamentRow = fallback;
+    } else {
+      // Create default tournament 1
+      const today = new Date().toISOString().split("T")[0];
+      await db.execute({
+        sql: "INSERT INTO tournaments (id, name, date, courts_count, target_games, status) VALUES (1, 'Torneo Cancha Libre', ?, 5, 4, 'active')",
+        args: [today],
+      });
+      tournamentRow = await db.execute("SELECT id, name, date, courts_count, target_games, status, created_at FROM tournaments WHERE id = 1");
+    }
+  }
+
+  const tRow = tournamentRow.rows[0];
+  const tournament: Tournament = {
+    id: Number(tRow.id),
+    name: String(tRow.name),
+    date: String(tRow.date),
+    courts_count: Number(tRow.courts_count),
+    target_games: Number(tRow.target_games),
+    status: (tRow.status as 'active' | 'finished') || 'active',
+    created_at: String(tRow.created_at),
   };
 
-  // 2. Fetch all players
-  const playersResult = await db.execute(
-    "SELECT id, name, phone, active, created_at FROM players ORDER BY id ASC"
-  );
+  const settings: TournamentSettings = {
+    active_tournament_id: tournament.id,
+    tournament_name: tournament.name,
+    tournament_date: tournament.date,
+    courts_count: tournament.courts_count,
+    target_games: tournament.target_games,
+    admin_pin: settingsMap.admin_pin || "1234",
+    status: tournament.status,
+  };
+
+  // 3. Fetch players for this tournament
+  const playersResult = await db.execute({
+    sql: "SELECT id, tournament_id, name, phone, active, created_at FROM players WHERE tournament_id = ? ORDER BY id ASC",
+    args: [tournament.id],
+  });
+
   const players: Player[] = playersResult.rows.map((row) => ({
     id: Number(row.id),
+    tournament_id: Number(row.tournament_id),
     name: String(row.name),
     phone: row.phone ? String(row.phone) : undefined,
     active: Number(row.active),
@@ -47,26 +93,31 @@ export async function getTournamentState(): Promise<TournamentState> {
     playerMap.set(p.id, p);
   }
 
-  // 3. Fetch all matches with player names
-  const matchesResult = await db.execute(`
-    SELECT 
-      m.id, m.round, m.court, 
-      m.t1_p1_id, m.t1_p2_id, m.t2_p1_id, m.t2_p2_id,
-      m.t1_games, m.t2_games, m.status, m.created_at, m.finished_at,
-      p1.name as t1_p1_name,
-      p2.name as t1_p2_name,
-      p3.name as t2_p1_name,
-      p4.name as t2_p2_name
-    FROM matches m
-    LEFT JOIN players p1 ON m.t1_p1_id = p1.id
-    LEFT JOIN players p2 ON m.t1_p2_id = p2.id
-    LEFT JOIN players p3 ON m.t2_p1_id = p3.id
-    LEFT JOIN players p4 ON m.t2_p2_id = p4.id
-    ORDER BY m.id DESC
-  `);
+  // 4. Fetch matches for this tournament
+  const matchesResult = await db.execute({
+    sql: `
+      SELECT 
+        m.id, m.tournament_id, m.round, m.court, 
+        m.t1_p1_id, m.t1_p2_id, m.t2_p1_id, m.t2_p2_id,
+        m.t1_games, m.t2_games, m.status, m.created_at, m.finished_at,
+        p1.name as t1_p1_name,
+        p2.name as t1_p2_name,
+        p3.name as t2_p1_name,
+        p4.name as t2_p2_name
+      FROM matches m
+      LEFT JOIN players p1 ON m.t1_p1_id = p1.id
+      LEFT JOIN players p2 ON m.t1_p2_id = p2.id
+      LEFT JOIN players p3 ON m.t2_p1_id = p3.id
+      LEFT JOIN players p4 ON m.t2_p2_id = p4.id
+      WHERE m.tournament_id = ?
+      ORDER BY m.id DESC
+    `,
+    args: [tournament.id],
+  });
 
   const matches: Match[] = matchesResult.rows.map((row) => ({
     id: Number(row.id),
+    tournament_id: Number(row.tournament_id),
     round: Number(row.round),
     court: Number(row.court),
     t1_p1_id: Number(row.t1_p1_id),
@@ -84,7 +135,7 @@ export async function getTournamentState(): Promise<TournamentState> {
     t2_p2_name: row.t2_p2_name ? String(row.t2_p2_name) : "Jugador " + row.t2_p2_id,
   }));
 
-  // 4. Compute statistics for each player
+  // 5. Compute statistics for each player
   const statsMap = new Map<number, PlayerStats>();
 
   for (const p of players) {
@@ -114,7 +165,6 @@ export async function getTournamentState(): Promise<TournamentState> {
       currentlyPlayingPlayerIds.add(m.t2_p2_id);
     }
 
-    // Both in_progress and finished count for partner history to prevent repeating!
     if (m.status === 'finished' || m.status === 'in_progress') {
       const recordPair = (p1Id: number, p2Id: number) => {
         const s1 = statsMap.get(p1Id);
@@ -183,11 +233,7 @@ export async function getTournamentState(): Promise<TournamentState> {
     }
   }
 
-  // Sort players by:
-  // 1. game_diff descending (Total points)
-  // 2. games_for descending
-  // 3. matches_won descending
-  // 4. name alphabetical
+  // Sort players
   const playerStatsList = Array.from(statsMap.values()).sort((a, b) => {
     if (b.game_diff !== a.game_diff) {
       return b.game_diff - a.game_diff;
@@ -201,7 +247,7 @@ export async function getTournamentState(): Promise<TournamentState> {
     return a.name.localeCompare(b.name);
   });
 
-  // 5. Courts state
+  // 6. Courts state
   const courts: { courtNumber: number; activeMatch: Match | null }[] = [];
   for (let c = 1; c <= settings.courts_count; c++) {
     const activeMatch = matches.find(
@@ -214,10 +260,38 @@ export async function getTournamentState(): Promise<TournamentState> {
   }
 
   return {
+    tournament,
     settings,
     players: playerStatsList,
     matches,
     courts,
     currentlyPlayingPlayerIds: Array.from(currentlyPlayingPlayerIds),
   };
+}
+
+export async function getAllTournaments(): Promise<Tournament[]> {
+  const db = await initDb();
+  const rows = await db.execute(`
+    SELECT 
+      t.id, t.name, t.date, t.courts_count, t.target_games, t.status, t.created_at,
+      COUNT(DISTINCT p.id) as players_count,
+      COUNT(DISTINCT CASE WHEN m.status = 'finished' THEN m.id END) as matches_count
+    FROM tournaments t
+    LEFT JOIN players p ON p.tournament_id = t.id
+    LEFT JOIN matches m ON m.tournament_id = t.id
+    GROUP BY t.id
+    ORDER BY t.id DESC
+  `);
+
+  return rows.rows.map((row) => ({
+    id: Number(row.id),
+    name: String(row.name),
+    date: String(row.date),
+    courts_count: Number(row.courts_count),
+    target_games: Number(row.target_games),
+    status: (row.status as 'active' | 'finished') || 'active',
+    created_at: String(row.created_at),
+    players_count: Number(row.players_count || 0),
+    matches_count: Number(row.matches_count || 0),
+  }));
 }

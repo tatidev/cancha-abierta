@@ -5,9 +5,13 @@ import { validateManualMatch } from "@/lib/matchmaker";
 
 export const dynamic = "force-dynamic";
 
-export async function GET() {
+export async function GET(req: Request) {
   try {
-    const state = await getTournamentState();
+    const url = new URL(req.url);
+    const tournamentIdParam = url.searchParams.get("tournament_id");
+    const targetId = tournamentIdParam ? parseInt(tournamentIdParam, 10) : undefined;
+
+    const state = await getTournamentState(targetId);
     return NextResponse.json({ matches: state.matches });
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : "Error al obtener partidos";
@@ -26,8 +30,14 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "No se proporcionaron partidos para crear." }, { status: 400 });
     }
 
-    const state = await getTournamentState();
     const db = await initDb();
+    let tourneyId = body.tournament_id ? parseInt(body.tournament_id, 10) : undefined;
+    if (!tourneyId) {
+      const activeSetting = await db.execute("SELECT value FROM settings WHERE key = 'active_tournament_id'");
+      tourneyId = activeSetting.rows[0]?.value ? parseInt(String(activeSetting.rows[0].value), 10) : 1;
+    }
+
+    const state = await getTournamentState(tourneyId);
 
     // Validate each match
     for (const m of matchesToCreate) {
@@ -65,13 +75,13 @@ export async function POST(req: Request) {
 
       // Insert match
       await db.execute({
-        sql: `INSERT INTO matches (round, court, t1_p1_id, t1_p2_id, t2_p1_id, t2_p2_id, status)
-              VALUES (?, ?, ?, ?, ?, ?, 'in_progress')`,
-        args: [round, court, t1_p1_id, t1_p2_id, t2_p1_id, t2_p2_id],
+        sql: `INSERT INTO matches (tournament_id, round, court, t1_p1_id, t1_p2_id, t2_p1_id, t2_p2_id, status)
+              VALUES (?, ?, ?, ?, ?, ?, ?, 'in_progress')`,
+        args: [tourneyId, round, court, t1_p1_id, t1_p2_id, t2_p1_id, t2_p2_id],
       });
     }
 
-    const updatedState = await getTournamentState();
+    const updatedState = await getTournamentState(tourneyId);
     return NextResponse.json({
       success: true,
       message: `${matchesToCreate.length} partido(s) iniciado(s) correctamente.`,
