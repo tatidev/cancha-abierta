@@ -20,7 +20,7 @@ import SettingsModal from "@/components/SettingsModal";
 import TournamentsModal from "@/components/TournamentsModal";
 import AssignCourtModal from "@/components/AssignCourtModal";
 import QrModal from "@/components/QrModal";
-import { Trophy, PlayCircle, History, Sparkles, Users, RefreshCw } from "lucide-react";
+import { Trophy, PlayCircle, History, Sparkles, Users, RefreshCw, AlertTriangle } from "lucide-react";
 
 export default function PadelApp() {
   // Main tournament state
@@ -63,13 +63,19 @@ export default function PadelApp() {
   const [matchmakerWarning, setMatchmakerWarning] = useState<string | undefined>();
   const [targetCourtForGen, setTargetCourtForGen] = useState<number | undefined>();
 
+  // Error state for DB connection
+  const [dbError, setDbError] = useState<string | null>(null);
+
   // Fetch tournament state
   const fetchState = useCallback(async (customTournamentId?: number) => {
     try {
       const tId = customTournamentId !== undefined ? customTournamentId : viewingTournamentId;
       const url = tId ? `/api/tournament?tournament_id=${tId}` : "/api/tournament";
       const res = await fetch(url, { cache: "no-store" });
-      if (!res.ok) throw new Error("Error al consultar el servidor");
+      if (!res.ok) {
+        const errJson = await res.json().catch(() => ({}));
+        throw new Error(errJson.error || `Error ${res.status} al consultar la base de datos`);
+      }
       const data = await res.json();
 
       setSettings(data.settings);
@@ -78,8 +84,11 @@ export default function PadelApp() {
       setCourts(data.courts || []);
       setCurrentlyPlayingIds(data.currentlyPlayingPlayerIds || []);
       setLastUpdated(new Date());
-    } catch (err) {
+      setDbError(null);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Error al conectar con el servidor";
       console.error("Error fetching tournament state:", err);
+      setDbError(msg);
     }
   }, [viewingTournamentId]);
 
@@ -387,6 +396,38 @@ export default function PadelApp() {
 
       {/* Main Content Area */}
       <main className="flex-1 max-w-7xl w-full mx-auto p-4 sm:p-6 space-y-6">
+        {/* DB Connection Error Banner */}
+        {dbError && (
+          <div className="bg-amber-500/10 border border-amber-500/30 rounded-2xl p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-amber-200 shadow-lg">
+            <div className="flex items-start gap-3">
+              <AlertTriangle className="w-5 h-5 text-amber-400 shrink-0 mt-0.5" />
+              <div>
+                <div className="font-semibold text-white text-sm">Problema de conexión con la Base de Datos</div>
+                <div className="text-xs text-amber-200/90 mt-0.5">{dbError}</div>
+                <div className="text-[11px] text-slate-400 mt-1">
+                  En Vercel: Asegúrate de tener <code className="text-amber-300">TURSO_DATABASE_URL</code> y <code className="text-amber-300">TURSO_AUTH_TOKEN</code> y luego haz un <strong className="text-white">Redeploy</strong>.
+                </div>
+              </div>
+            </div>
+            <div className="flex items-center gap-2 shrink-0 self-end sm:self-center">
+              <a
+                href="/api/db-check"
+                target="_blank"
+                rel="noreferrer"
+                className="text-xs px-3 py-1.5 rounded-lg bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/30 transition font-medium"
+              >
+                Diagnóstico API ↗
+              </a>
+              <button
+                onClick={() => fetchState()}
+                className="text-xs px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-medium transition"
+              >
+                Reintentar
+              </button>
+            </div>
+          </div>
+        )}
+
         {/* Quick Stats Strip */}
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
           <div className="bg-slate-900/80 border border-slate-800 rounded-2xl p-3.5 flex items-center gap-3">
