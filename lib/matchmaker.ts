@@ -229,8 +229,9 @@ export function validateManualMatch(
   t2_p2_id: number,
   allPlayers: PlayerStats[],
   matches: Match[],
-  currentMatchId?: number
-): { valid: boolean; error?: string; warning?: string } {
+  currentMatchId?: number,
+  allowRepeatPartners: boolean = false
+): { valid: boolean; error?: string; warning?: string; partnerRepeated?: boolean } {
   // Check unique players
   const ids = [t1_p1_id, t1_p2_id, t2_p1_id, t2_p2_id];
   const unique = new Set(ids);
@@ -242,20 +243,27 @@ export function validateManualMatch(
   const relevantMatches = matches.filter((m) => m.id !== currentMatchId && m.status !== 'cancelled');
   const history = buildHistory(relevantMatches);
 
+  let partnerRepeated = false;
+  const warnings: string[] = [];
+
   // Check Team 1 partner
   if (history.hasPartnered(t1_p1_id, t1_p2_id)) {
-    return {
-      valid: false,
-      error: `¡Regla violada! ${pMap.get(t1_p1_id) || 'Jugador 1'} y ${pMap.get(t1_p2_id) || 'Jugador 2'} ya jugaron juntos como pareja en este torneo.`,
-    };
+    partnerRepeated = true;
+    const msg = `Atención: ${pMap.get(t1_p1_id) || 'Jugador 1'} y ${pMap.get(t1_p2_id) || 'Jugador 2'} ya jugaron juntos como pareja en este torneo.`;
+    if (!allowRepeatPartners) {
+      return { valid: false, error: msg, partnerRepeated: true };
+    }
+    warnings.push(msg);
   }
 
   // Check Team 2 partner
   if (history.hasPartnered(t2_p1_id, t2_p2_id)) {
-    return {
-      valid: false,
-      error: `¡Regla violada! ${pMap.get(t2_p1_id) || 'Jugador 3'} y ${pMap.get(t2_p2_id) || 'Jugador 4'} ya jugaron juntos como pareja en este torneo.`,
-    };
+    partnerRepeated = true;
+    const msg = `Atención: ${pMap.get(t2_p1_id) || 'Jugador 3'} y ${pMap.get(t2_p2_id) || 'Jugador 4'} ya jugaron juntos como pareja en este torneo.`;
+    if (!allowRepeatPartners) {
+      return { valid: false, error: msg, partnerRepeated: true };
+    }
+    warnings.push(msg);
   }
 
   // Soft warning about opponents
@@ -265,10 +273,13 @@ export function validateManualMatch(
     history.getOpponentCount(t1_p2_id, t2_p1_id) +
     history.getOpponentCount(t1_p2_id, t2_p2_id);
 
-  let warning: string | undefined;
   if (oppCount > 0) {
-    warning = `Nota: Algunos de estos jugadores ya se enfrentaron como rivales previamente (${oppCount} cruces previos). Está permitido según el reglamento.`;
+    warnings.push(`Nota: Algunos jugadores ya se enfrentaron como rivales (${oppCount} cruce(s) previo(s)).`);
   }
 
-  return { valid: true, warning };
+  return {
+    valid: true,
+    warning: warnings.length > 0 ? warnings.join(" | ") : undefined,
+    partnerRepeated,
+  };
 }

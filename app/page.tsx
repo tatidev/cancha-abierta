@@ -18,6 +18,7 @@ import MatchmakerModal from "@/components/MatchmakerModal";
 import PlayerModal from "@/components/PlayerModal";
 import SettingsModal from "@/components/SettingsModal";
 import TournamentsModal from "@/components/TournamentsModal";
+import AssignCourtModal from "@/components/AssignCourtModal";
 import QrModal from "@/components/QrModal";
 import { Trophy, PlayCircle, History, Sparkles, Users, RefreshCw } from "lucide-react";
 
@@ -56,6 +57,7 @@ export default function PadelApp() {
 
   // Matchmaker modal state
   const [isMatchmakerOpen, setIsMatchmakerOpen] = useState(false);
+  const [assignCourtNumber, setAssignCourtNumber] = useState<number | null>(null);
   const [proposedMatches, setProposedMatches] = useState<ProposedMatch[]>([]);
   const [waitingPlayers, setWaitingPlayers] = useState<PlayerStats[]>([]);
   const [matchmakerWarning, setMatchmakerWarning] = useState<string | undefined>();
@@ -201,13 +203,18 @@ export default function PadelApp() {
 
   // Matchmaking: Generate matches
   const handleGenerateMatches = async (courtNumber?: number) => {
-    setTargetCourtForGen(courtNumber);
+    if (courtNumber !== undefined) {
+      setAssignCourtNumber(courtNumber);
+      return;
+    }
+
+    setTargetCourtForGen(undefined);
     const currentTourneyId = viewingTournamentId || settings.active_tournament_id;
     try {
       const res = await fetch("/api/generate-matches", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ courtNumber, tournament_id: currentTourneyId }),
+        body: JSON.stringify({ tournament_id: currentTourneyId }),
       });
       const data = await res.json();
       if (!res.ok) {
@@ -223,6 +230,30 @@ export default function PadelApp() {
       const msg = err instanceof Error ? err.message : "Error al conectar";
       alert(msg);
     }
+  };
+
+  // Confirm single match (from AssignCourtModal - Auto or Manual)
+  const handleConfirmSingleMatch = async (matchData: {
+    court: number;
+    round: number;
+    t1_p1_id: number;
+    t1_p2_id: number;
+    t2_p1_id: number;
+    t2_p2_id: number;
+    allow_repeat?: boolean;
+  }) => {
+    const currentTourneyId = viewingTournamentId || settings.active_tournament_id;
+    const res = await fetch("/api/matches", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        ...matchData,
+        tournament_id: currentTourneyId,
+      }),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || "Error al asignar partido");
+    await fetchState();
   };
 
   // Confirm proposed matches
@@ -537,8 +568,23 @@ export default function PadelApp() {
         waitingPlayers={waitingPlayers}
         warning={matchmakerWarning}
         onConfirm={handleConfirmProposedMatches}
-        onRegenerate={() => handleGenerateMatches(targetCourtForGen)}
+        onRegenerate={() => handleGenerateMatches()}
       />
+
+      {assignCourtNumber !== null && (
+        <AssignCourtModal
+          isOpen={assignCourtNumber !== null}
+          onClose={() => setAssignCourtNumber(null)}
+          courtNumber={assignCourtNumber}
+          currentRound={
+            matches.reduce((max, m) => (m.round > max ? m.round : max), 0) + 1
+          }
+          players={players}
+          matches={matches}
+          currentlyPlayingIds={currentlyPlayingIds}
+          onConfirmMatch={handleConfirmSingleMatch}
+        />
+      )}
 
       <SettingsModal
         isOpen={isSettingsOpen}

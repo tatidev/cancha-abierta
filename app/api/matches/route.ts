@@ -59,6 +59,8 @@ export async function POST(req: Request) {
         );
       }
 
+      const allowRepeat = Boolean(m.allow_repeat || body.allow_repeat);
+
       // Validate anti-repetition rule
       const validation = validateManualMatch(
         t1_p1_id,
@@ -66,7 +68,9 @@ export async function POST(req: Request) {
         t2_p1_id,
         t2_p2_id,
         state.players,
-        state.matches
+        state.matches,
+        undefined,
+        allowRepeat
       );
 
       if (!validation.valid) {
